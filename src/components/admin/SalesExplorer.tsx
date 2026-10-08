@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import type { DailySale } from "@/lib/admin-data";
 import { type WeeklyRow as Row, withWeekAverage } from "@/lib/sales";
 import { formatPrice } from "@/lib/format";
@@ -13,13 +13,13 @@ export default function SalesExplorer({ sales }: { sales: DailySale[] }) {
   const deferredQuery = useDeferredValue(query);
   const isStale = query !== deferredQuery;
 
-  // The week average does not depend on the filter: compute it once
-  const allRows = useMemo(() => withWeekAverage(sales), [sales]);
+  // The week average does not depend on the filter: computed once.
+  // No useMemo needed: the React Compiler memoizes it (it only depends on sales).
+  const allRows = withWeekAverage(sales);
 
   const q = deferredQuery.trim().toLowerCase();
-  const rows = useMemo(
-    () => allRows.filter((s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q)),
-    [allRows, q],
+  const rows = allRows.filter(
+    (s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q),
   );
   const totalRevenue = rows.reduce((sum, s) => sum + s.revenue, 0);
   const totalQuantity = rows.reduce((sum, s) => sum + s.quantity, 0);
@@ -51,8 +51,9 @@ function Summary({ count, quantity, revenue }: { count: number; quantity: number
   );
 }
 
-// memo: when only the input changes, React can skip this whole table
-const SalesTable = memo(function SalesTable({ rows }: { rows: Row[] }) {
+// No memo() needed either: with the compiler, the <SalesTable> element is
+// reused while `rows` is the same array, so typing only re-renders the input
+function SalesTable({ rows }: { rows: Row[] }) {
   return (
     <table className="mt-4 w-full overflow-hidden rounded-xl bg-white text-left text-sm shadow-sm">
       <thead className="bg-stone-50 text-xs uppercase text-ink/60">
@@ -72,8 +73,9 @@ const SalesTable = memo(function SalesTable({ rows }: { rows: Row[] }) {
       </tbody>
     </table>
   );
-});
+}
 
+// A plain function from lib/format: no context, so the clock cannot reach it
 function SalesRow({ row }: { row: Row }) {
   return (
     <tr className="border-t border-black/5">
