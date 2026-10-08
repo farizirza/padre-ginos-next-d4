@@ -3,7 +3,7 @@
 import { memo, useDeferredValue, useMemo, useState } from "react";
 import type { DailySale } from "@/lib/admin-data";
 import { type WeeklyRow as Row, withWeekAverage } from "@/lib/sales";
-import { useLive } from "./LiveProvider";
+import { formatPrice } from "@/lib/format";
 
 const MAX_ROWS = 1000;
 
@@ -42,7 +42,6 @@ export default function SalesExplorer({ sales }: { sales: DailySale[] }) {
 }
 
 function Summary({ count, quantity, revenue }: { count: number; quantity: number; revenue: number }) {
-  const { formatPrice } = useLive();
   return (
     <p className="mt-3 text-sm text-ink/70" data-testid="sales-summary">
       {count.toLocaleString("en-US")} baris · {quantity.toLocaleString("en-US")} pizza ·{" "}
@@ -76,7 +75,6 @@ const SalesTable = memo(function SalesTable({ rows }: { rows: Row[] }) {
 });
 
 function SalesRow({ row }: { row: Row }) {
-  const { formatPrice } = useLive();
   return (
     <tr className="border-t border-black/5">
       <td className="px-4 py-1.5">{row.date}</td>
