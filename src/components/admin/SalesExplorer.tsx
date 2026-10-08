@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useDeferredValue, useMemo, useState } from "react";
 import type { DailySale } from "@/lib/admin-data";
 import { type WeeklyRow as Row, withWeekAverage } from "@/lib/sales";
 import { useLive } from "./LiveProvider";
@@ -9,14 +9,20 @@ const MAX_ROWS = 1000;
 
 export default function SalesExplorer({ sales }: { sales: DailySale[] }) {
   const [query, setQuery] = useState("");
+  // The input updates right away; the table follows when React has time
+  const deferredQuery = useDeferredValue(query);
+  const isStale = query !== deferredQuery;
 
-  const q = query.trim().toLowerCase();
-  const matches = sales.filter(
-    (s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q),
+  // The week average does not depend on the filter: compute it once
+  const allRows = useMemo(() => withWeekAverage(sales), [sales]);
+
+  const q = deferredQuery.trim().toLowerCase();
+  const rows = useMemo(
+    () => allRows.filter((s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q)),
+    [allRows, q],
   );
-  const rows = withWeekAverage(matches);
-  const totalRevenue = matches.reduce((sum, s) => sum + s.revenue, 0);
-  const totalQuantity = matches.reduce((sum, s) => sum + s.quantity, 0);
+  const totalRevenue = rows.reduce((sum, s) => sum + s.revenue, 0);
+  const totalQuantity = rows.reduce((sum, s) => sum + s.quantity, 0);
 
   return (
     <div className="mt-6">
@@ -27,8 +33,10 @@ export default function SalesExplorer({ sales }: { sales: DailySale[] }) {
         aria-label="Cari pizza atau kategori"
         className="w-full max-w-md rounded-lg border border-black/10 bg-white px-4 py-2"
       />
-      <Summary count={matches.length} quantity={totalQuantity} revenue={totalRevenue} />
-      <SalesTable rows={rows.slice(0, MAX_ROWS)} />
+      <Summary count={rows.length} quantity={totalQuantity} revenue={totalRevenue} />
+      <div style={{ opacity: isStale ? 0.6 : 1 }}>
+        <SalesTable rows={rows} />
+      </div>
     </div>
   );
 }
@@ -44,7 +52,8 @@ function Summary({ count, quantity, revenue }: { count: number; quantity: number
   );
 }
 
-function SalesTable({ rows }: { rows: Row[] }) {
+// memo: when only the input changes, React can skip this whole table
+const SalesTable = memo(function SalesTable({ rows }: { rows: Row[] }) {
   return (
     <table className="mt-4 w-full overflow-hidden rounded-xl bg-white text-left text-sm shadow-sm">
       <thead className="bg-stone-50 text-xs uppercase text-ink/60">
@@ -58,13 +67,13 @@ function SalesTable({ rows }: { rows: Row[] }) {
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => (
+        {rows.slice(0, MAX_ROWS).map((row) => (
           <SalesRow key={`${row.date}-${row.pizzaId}`} row={row} />
         ))}
       </tbody>
     </table>
   );
-}
+});
 
 function SalesRow({ row }: { row: Row }) {
   const { formatPrice } = useLive();
